@@ -1,349 +1,380 @@
 <?php
-/* vim: set expandtab tabstop=4 shiftwidth=4: */
-// +----------------------------------------------------------------------+
-// | PHP version 5                                                        |
-// +----------------------------------------------------------------------+
-// | Copyright (c) 1997-2004 The PHP Group                                |
-// +----------------------------------------------------------------------+
-// | This source file is subject to version 3.0 of the PHP license,       |
-// | that is bundled with this package in the file LICENSE, and is        |
-// | available through the world-wide-web at the following url:           |
-// | http://www.php.net/license/3_0.txt.                                  |
-// | If you did not receive a copy of the PHP license and are unable to   |
-// | obtain it through the world-wide-web, please send a note to          |
-// | license@php.net so we can mail you a copy immediately.               |
-// +----------------------------------------------------------------------+
-// | Authors: Original Author <author@example.com>                        |
-// |          Your Name <you@example.com>                                 |
-// +----------------------------------------------------------------------+
-//
-// $Id:$
-
-include_once ('server.php');
+include_once( 'server.php' );
 session_start();
-if (empty($_SESSION) || empty($_SESSION['userinfo'])) {
-    $_SESSION['userurl'] = $_SERVER['REQUEST_URI'];
-    header("Location: /index.php");
+
+if(empty($_SESSION)||empty($_SESSION['userinfo']))
+{
+        $_SESSION['userurl'] = $_SERVER['REQUEST_URI'];
+	header("Location: /index.php");
 }
 $user_id = $_SESSION['userinfo']['user_id'];
 $user_name = $_SESSION['userinfo']['user_name'];
 $fromwhere = $_SESSION['userinfo']['from'];
 $information = getUserInformation($user_id);
-if ($information['homeassistantURL'] == null) {
-    echo '新用户';
-    die;
-    $homeassistantURL = 'your homeassistant URL';
-    $homeassistantPASS = 'your homeassistant PASSWORD';
-    $email = 'your email';
+if ($information['homeassistantURL']==null)
+{
+	echo '新用户';
+	die;
+	$homeassistantURL = 'your homeassistant URL';
+	$homeassistantPASS = 'your homeassistant PASSWORD';
+	$email = 'your email';
 }
 $homeassistantURL = $information['homeassistantURL'];
 $homeassistantPASS = $information['homeassistantPASS'];
 $email = $information['email'];
-$url = $homeassistantURL . "/api/states?api_password=" . $homeassistantPASS;
-$ch = curl_init();
-// set url
+
+$url = $homeassistantURL."/api/states?api_password=".$homeassistantPASS;
+$ch = curl_init(); 
+   // set url 
 curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-    "Content-Type: application/json\r\n" . "Authorization: Bearer " . $homeassistantPASS . "\r\n"
+"Content-Type: application/json\r\n"."Authorization: Bearer ".$homeassistantPASS."\r\n"
 ));
-curl_setopt($ch, CURLOPT_URL, $url);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+curl_setopt($ch, CURLOPT_URL, $url); 
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1); 
 curl_setopt($ch, CURLOPT_TIMEOUT, 2); //设置整个网络请求最长执行时间为2秒
 curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1); //设置连接目标服务器1秒无响应时判断为超时
-//curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-//curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-$query_response = curl_exec($ch);
-$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$errorCode = curl_errno($ch);
-if ($http_code >= 400 && $http_code < 500) {
-    echo '请检查您的homeassistant密码是否正确或自行验证下方链接是否可以打开您的HomeAssistant，' . PHP_EOL . '链接：';
-    echo '<p><a href="' . $url . '">点击链接检查是否可以正常打开</a></p>';
-    die;
+
+#curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+#curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+
+$query_response = curl_exec($ch); 
+$http_code = curl_getinfo($ch,CURLINFO_HTTP_CODE);
+$errorCode =curl_errno($ch);
+if ($http_code >= 400 && $http_code < 500)
+{
+	echo '请检查您的homeassistant密码是否正确或自行验证下方链接是否可以打开您的HomeAssistant，'.PHP_EOL.'链接：';
+	echo '<p><a href="'.$url.'">点击链接检查是否可以正常打开</a></p>';
+
+	die;
 }
-if ($http_code > 500) {
-    echo '请检查您的homeassistant运行状态是否正确';
-    die;
+if ($http_code > 500)
+{
+	echo '请检查您的homeassistant运行状态是否正确';
+	die;
 }
-if ($errorCode) {
-    echo '超时或其他错误' . curl_error($ch);
-    die;
+if ($errorCode)
+{
+	echo '超时或其他错误'.curl_error($ch);
+	die;
 }
-curl_close($ch);
-//$query_response = @file_get_contents($homeassistantURL."/api/states?api_password=".$homeassistantPASS);
-//if ($query_response === FALSE){
-//	echo 'something error whit your homeassistant'.PHP_EOL;
-//	$error = var_dump($http_response_header);
-//	echo $error[0];
-//	die;
-//}
+curl_close($ch);  
+
+
+#$query_response = @file_get_contents($homeassistantURL."/api/states?api_password=".$homeassistantPASS);
+#if ($query_response === FALSE){
+#	echo 'something error whit your homeassistant'.PHP_EOL;
+#	$error = var_dump($http_response_header);
+#	echo $error[0];
+#	die;
+#}
 $arr = json_decode($query_response);
-$binary_sensor = array();
-$sensor = array();
-$light = array();
-$cover = array();
-$switch = array();
-$vacuum = array();
-$fan = array();
-$media_player = array();
-$scripts = array();
-$climate = array();
-$num = count($arr);
-for ($i = 0; $i < $num; ++$i) {
-    if (strstr($arr[$i]->entity_id, "binary_sensor.")) {
-        array_push($binary_sensor, $arr[$i]);
-        continue;
-    }
-    if (strstr($arr[$i]->entity_id, "sensor.") && (strstr($arr[$i]->entity_id, "temperature") || strstr($arr[$i]->entity_id, "humidity") || strstr($arr[$i]->entity_id, "pm25"))) {
-        array_push($sensor, $arr[$i]);
-        continue;
-    }
-    if (strstr($arr[$i]->entity_id, "light.")) {
-        array_push($light, $arr[$i]);
-        continue;
-    }
-    if (strstr($arr[$i]->entity_id, "cover.")) {
-        array_push($cover, $arr[$i]);
-        continue;
-    }
-    if (strstr($arr[$i]->entity_id, "switch.")) {
-        array_push($switch, $arr[$i]);
-        continue;
-    }
-    if (strstr($arr[$i]->entity_id, "vacuum.")) {
-        array_push($vacuum, $arr[$i]);
-        continue;
-    }
-    if (strstr($arr[$i]->entity_id, "fan.")) {
-        array_push($fan, $arr[$i]);
-        continue;
-    }
-    if (strstr($arr[$i]->entity_id, "media_player.")) {
-        array_push($media_player, $arr[$i]);
-        continue;
-    }
-    if (strstr($arr[$i]->entity_id, "script.")) {
-        array_push($scripts, $arr[$i]);
-        continue;
-    }
-    if (strstr($arr[$i]->entity_id, "climate.")) {
-        array_push($climate, $arr[$i]);
-        continue;
-    }
+$binary_sensor=array();
+$sensor=array();
+$light=array();
+$cover=array();
+$switch=array();
+$vacuum=array();
+$fan=array();
+$media_player=array();
+$scripts=array();
+$climate=array();
+$num = count($arr); 
+for($i=0;$i<$num;++$i){ 
+	if (strstr($arr[$i]->entity_id,"binary_sensor.")){
+		array_push($binary_sensor,$arr[$i]);
+		continue;
+	}
+	if (strstr($arr[$i]->entity_id,"sensor.")&&(strstr($arr[$i]->entity_id,"temperature")||strstr($arr[$i]->entity_id,"humidity")||strstr($arr[$i]->entity_id,"pm25"))){
+		array_push($sensor,$arr[$i]);
+		continue;
+	}
+	if (strstr($arr[$i]->entity_id,"light.")){
+		array_push($light,$arr[$i]);
+		continue;
+	}
+	if (strstr($arr[$i]->entity_id,"cover.")){
+		array_push($cover,$arr[$i]);
+		continue;
+	}
+	if (strstr($arr[$i]->entity_id,"switch.")){
+		array_push($switch,$arr[$i]);
+		continue;
+	}
+	if (strstr($arr[$i]->entity_id,"vacuum.")){
+		array_push($vacuum,$arr[$i]);
+		continue;
+	}
+	if (strstr($arr[$i]->entity_id,"fan.")){
+		array_push($fan,$arr[$i]);
+		continue;
+	}
+	if (strstr($arr[$i]->entity_id,"media_player.")){
+		array_push($media_player,$arr[$i]);
+		continue;
+	}
+	if (strstr($arr[$i]->entity_id,"script.")){
+		array_push($scripts,$arr[$i]);
+		continue;
+	}
+	if (strstr($arr[$i]->entity_id,"climate.")){
+		array_push($climate,$arr[$i]);
+		continue;
+	}
 }
-$hadevice = array();
-$num = count($cover);
-for ($i = 0; $i < $num; ++$i) {
-    array_push($hadevice, array(
-        "entity_id" => $cover[$i]->entity_id,
-        "friendly_name" => $cover[$i]->attributes->friendly_name
-    ));
+$hadevice=array();
+$num = count($cover); 
+for($i=0;$i<$num;++$i){ 
+  array_push($hadevice,array("entity_id" => $cover[$i]->entity_id,"friendly_name" => $cover[$i]->attributes->friendly_name));
+}	  
+	
+$num = count($light); 
+for($i=0;$i<$num;++$i){ 
+  array_push($hadevice,array("entity_id" => $light[$i]->entity_id,"friendly_name" => $light[$i]->attributes->friendly_name));
 }
-$num = count($light);
-for ($i = 0; $i < $num; ++$i) {
-    array_push($hadevice, array(
-        "entity_id" => $light[$i]->entity_id,
-        "friendly_name" => $light[$i]->attributes->friendly_name
-    ));
+$num = count($switch); 
+for($i=0;$i<$num;++$i){ 
+  array_push($hadevice,array("entity_id" => $switch[$i]->entity_id,"friendly_name" => $switch[$i]->attributes->friendly_name));
 }
-$num = count($switch);
-for ($i = 0; $i < $num; ++$i) {
-    array_push($hadevice, array(
-        "entity_id" => $switch[$i]->entity_id,
-        "friendly_name" => $switch[$i]->attributes->friendly_name
-    ));
+$num = count($vacuum); 
+for($i=0;$i<$num;++$i){ 
+  array_push($hadevice,array("entity_id" => $vacuum[$i]->entity_id,"friendly_name" => $vacuum[$i]->attributes->friendly_name));
 }
-$num = count($vacuum);
-for ($i = 0; $i < $num; ++$i) {
-    array_push($hadevice, array(
-        "entity_id" => $vacuum[$i]->entity_id,
-        "friendly_name" => $vacuum[$i]->attributes->friendly_name
-    ));
+$num = count($sensor); 
+for($i=0;$i<$num;++$i){ 	
+  array_push($hadevice,array("entity_id" => $sensor[$i]->entity_id,"friendly_name" => $sensor[$i]->attributes->friendly_name));
 }
-$num = count($sensor);
-for ($i = 0; $i < $num; ++$i) {
-    array_push($hadevice, array(
-        "entity_id" => $sensor[$i]->entity_id,
-        "friendly_name" => $sensor[$i]->attributes->friendly_name
-    ));
+$num = count($fan); 
+for($i=0;$i<$num;++$i){ 	
+  array_push($hadevice,array("entity_id" => $fan[$i]->entity_id,"friendly_name" => $fan[$i]->attributes->friendly_name));
 }
-$num = count($fan);
-for ($i = 0; $i < $num; ++$i) {
-    array_push($hadevice, array(
-        "entity_id" => $fan[$i]->entity_id,
-        "friendly_name" => $fan[$i]->attributes->friendly_name
-    ));
+$num = count($media_player); 
+for($i=0;$i<$num;++$i){ 	
+  array_push($hadevice,array("entity_id" => $media_player[$i]->entity_id,"friendly_name" => $media_player[$i]->attributes->friendly_name));
 }
-$num = count($media_player);
-for ($i = 0; $i < $num; ++$i) {
-    array_push($hadevice, array(
-        "entity_id" => $media_player[$i]->entity_id,
-        "friendly_name" => $media_player[$i]->attributes->friendly_name
-    ));
+$num = count($scripts); 
+for($i=0;$i<$num;++$i){ 	
+  array_push($hadevice,array("entity_id" => $scripts[$i]->entity_id,"friendly_name" => $scripts[$i]->attributes->friendly_name));
 }
-$num = count($scripts);
-for ($i = 0; $i < $num; ++$i) {
-    array_push($hadevice, array(
-        "entity_id" => $scripts[$i]->entity_id,
-        "friendly_name" => $scripts[$i]->attributes->friendly_name
-    ));
-}
-$num = count($climate);
-for ($i = 0; $i < $num; ++$i) {
-    array_push($hadevice, array(
-        "entity_id" => $climate[$i]->entity_id,
-        "friendly_name" => $climate[$i]->attributes->friendly_name
-    ));
+$num = count($climate); 
+for($i=0;$i<$num;++$i){ 	
+  array_push($hadevice,array("entity_id" => $climate[$i]->entity_id,"friendly_name" => $climate[$i]->attributes->friendly_name));
 }
 ?>
 
 
-<!DOCTYPE html>
+<!doctype html>
 <html>
- <head> 
-  <meta charset="utf-8" /> 
-  <title>天猫精灵设备添加</title> 
-  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0" /> 
-  <link rel="stylesheet" href="weui/style/weuix.min.css" /> 
+<head>
+<meta charset="utf-8">
+<title>天猫精灵设备添加</title>
+ <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+  <link rel="stylesheet" href="weui/style/weuix.min.css"/>
+  
   <!--
     <link rel="icon" href="weui/favicon.ico">
---> 
-  <script src="weui/zepto.min.js"></script> 
-  <script src="weui/vue.js"></script> 
-  <script src="weui/vue-resource.js"></script> 
-  <script src="weui/select.js"></script> 
-  <script src="weui/picker.js"></script> 
-  <style>
+
+
+      
+-->
+      <script src="weui/zepto.min.js"></script>
+      <script src="weui/vue.js"></script>
+      <script src="weui/vue-resource.js"></script>
+      <script src="weui/select.js"></script>
+      <script src="weui/picker.js"></script>
+      <style>
          .weui_label {
     		display: block;
     		width: 260px;
     		word-wrap: break-word;
     		word-break: break-all;
-		  } 
-          .page-hd-title {
-             font-size: 20px;
-             font-weight: 400;
-             text-align: center;
-             margin-bottom: 15px;
-           }
+		} 
+                 .page-hd-title {
+    font-size: 20px;
+    font-weight: 400;
+    text-align: center;
+    margin-bottom: 15px;
+}
           
-       </style> 
- </head> 
- <body ontouchstart="" class="page-bg"> 
-  <div id="app"> 
-   <div class="tcenter" style="overflow:hidden; "> 
-    <template v-for="(item, index) in notice.logo"> 
-     <a v-bind:href="item.link" target="_blank"> <img class=" img-radius" style="margin:10px auto 0;height:50px;margin-left: 30px;" v-bind:src="item.img" /> </a> 
-    </template> 
-   </div> 
-   <div class="page-hd"> 
-    <h1 class="page-hd-title"> {{ notice.title }} </h1> 
-    <p class="page-hd-desc" style="margin-bottom: 30px;"> <a v-bind:href="notice.link" target="_blank"> {{ notice.notice }} </a> </p> 
-    <p class="page-hd-desc"> 填写下面的信息，生成配置文件。 </p> 
-   </div> 
-   <div class="page-bd"> 
-    <div class="weui_cells_title">
-     填写下列信息
-    </div> 
-    <div class="weui_cells weui_cells_form"> 
-     <div class="weui_cell"> 
-      <div class="weui_cell_hd">
-       <label class="weui_label">deviceId（设备Id）:</label>
-      </div> 
-      <div class="weui_cell_bd weui_cell_primary"> 
-       <select class="weui_select" name="select2" id="deviceId" v-model="deviceId">  <option v-bind:value="item['entity_id']">{{ item['friendly_name']+&quot; &quot;+item['entity_id'] }}</option>  </select> 
-      </div> 
-     </div> 
-     <div class="weui_cell"> 
-      <div class="weui_cell_hd">
-       <label class="weui_label">deviceName（设备名称）:</label>
-      </div> 
-      <div class="weui_cell_bd weui_cell_primary"> 
-       <input class="weui_input" id="deviceName" type="text" v-model="deviceName" placeholder="请输入deviceName" /> 
-      </div> 
-     </div> 
-     <div class="weui_cell weui_cell_select weui_select_after"> 
-      <div class="weui_cell_hd"> 
-       <label for="" class="weui_label">deviceType（设备类型）:</label> 
-      </div> 
-      <div class="weui_cell_bd weui_cell_primary"> 
-       <select class="weui_select" id="deviceType" name="select2" v-model="deviceType">  <option v-bind:value="item['value']">{{ item['title'] }}</option>  </select> 
-      </div> 
-     </div> 
-     <div class="weui_cell weui_cell_select weui_select_after"> 
-      <div class="weui_cell_hd"> 
-       <label for="" class="weui_label">zone（位置）:</label> 
-      </div> 
-      <div class="weui_cell_bd weui_cell_primary"> 
-       <select class="weui_select" id="zone" name="select2" v-model="zone">  <option v-bind:value="zoneData[index]">{{ item }}</option>  </select> 
-      </div> 
-     </div> 
-     <div class="weui_cell"> 
-      <div class="weui_cell_hd">
-       <label class="weui_label">brand（品牌）:</label>
-      </div> 
-      <div class="weui_cell_bd weui_cell_primary"> 
-       <input class="weui_input" id="brand" type="text" v-model="brand" placeholder="请输入brand" /> 
-      </div> 
-     </div> 
-     <div class="weui_cell"> 
-      <div class="weui_cell_hd">
-       <label class="weui_label">model（型号）:</label>
-      </div> 
-      <div class="weui_cell_bd weui_cell_primary"> 
-       <input class="weui_input" id="model" type="text" v-model="model" placeholder="请输入model" /> 
-      </div> 
-     </div> 
-     <div class="weui_cell"> 
-      <div class="weui_cell_hd">
-       <label class="weui_label">icon（图标）:</label>
-      </div> 
-      <div class="weui_cell_bd weui_cell_primary"> 
-       <input class="weui_input" id="icon" type="text" v-model="icon" placeholder="请输入icon" /> 
-      </div> 
-     </div> 
-     <div class="weui_cell"> 
-      <div class="weui_cell_hd">
-       <label for="" class="weui_label">properties（支持的属性状态）:</label>
-      </div> 
-      <div class="weui_cell_bd weui_cell_primary"> 
-       <input class="weui_input" type="text" value="" id="properties" placeholder="点击选择properties" /> 
-      </div> 
-     </div> 
-     <div class="weui_cell"> 
-      <div class="weui_cell_hd">
-       <label for="" class="weui_label">actions（支持的操作）:</label>
-      </div> 
-      <div class="weui_cell_bd weui_cell_primary"> 
-       <input class="weui_input" type="text" value="" id="actions" placeholder="点击选择actions" /> 
-      </div> 
-     </div> 
-    </div> 
-    <div class="weui_btn_area"> 
-     <a href="javascript:;" class="weui_btn weui_btn bg-blue" @click="saveData()">添 加</a> 
-    </div> 
-    <div class="weui_cells" style="margin-bottom:  50px; display:none;"> 
-     <p style="margin: 22px;" id="jsonData"> { &quot;deviceId&quot;:&quot;{{ deviceId }}&quot;, &quot;deviceName&quot;:&quot;{{ deviceName }}&quot;, &quot;deviceType&quot;:&quot;{{ deviceType }}&quot;, &quot;zone&quot;:&quot;{{ zone }}&quot;, &quot;brand&quot;:&quot;{{ brand }}&quot;, &quot;model&quot;:&quot;{{ model }}&quot;, &quot;icon&quot;:&quot;{{ icon }}&quot;, &quot;properties&quot;:{{ properties }}, &quot;actions&quot;:{{ actions }}, &quot;extensions&quot;:{ &quot;extension1&quot;:&quot;&quot;, &quot;extension2&quot;:&quot;&quot; } } </p> 
-    </div> 
-   </div> 
-   <div class="weui-footer" style="margin-top: 70px;"> 
-    <p class="weui-footer-text">Copyright &copy; qebabe</p> 
-   </div> 
-  </div> 
-  <script>
-</script>
- </body>
-</html>       
+    </style>
+
+</head>
+
+
+<body ontouchstart  class="page-bg">
+<div id="app">
+<div class="tcenter" style="overflow:hidden; ">
+ 
+    
+    <template v-for="(item, index) in notice.logo">
+    	<a v-bind:href="item.link" target="_blank">
+      		<img class=" img-radius"  style="margin:10px auto 0;height:50px;margin-left: 30px;" v-bind:src="item.img">
+    	</a>
+    </template>
+    
+    
+    
+</div>
+
+<div class="page-hd" >
+    <h1 class="page-hd-title">
+        {{ notice.title }}
+    </h1>
+    
+    <p class="page-hd-desc" style="margin-bottom: 30px;">
+        <a v-bind:href="notice.link" target="_blank">
+    		{{ notice.notice }}
+        </a>
+    </p>
+    <p class="page-hd-desc">
+    	填写下面的信息，生成配置文件。
+    
+    </p>
+</div>
+
+<div class="page-bd">
+    
+    <div class="weui_cells_title">填写下列信息</div>
+        <div class="weui_cells weui_cells_form">
+            <div class="weui_cell">
+                <div class="weui_cell_hd"><label class="weui_label">deviceId（设备Id）:</label></div>
+		<div class="weui_cell_bd weui_cell_primary">
+                   <select class="weui_select" name="select2" id="deviceId" v-model="deviceId" >
+
+                        <template v-for="(item, index) in Homeassistant_device">
+
+                                <option v-bind:value="item['entity_id']">{{ item['friendly_name']+" "+item['entity_id'] }}</option>
+
+                        </template>
+
+                    </select> 
+			
+                </div>
+            </div>
+            <div class="weui_cell">
+                <div class="weui_cell_hd"><label class="weui_label">deviceName（设备名称）:</label></div>
+                <div class="weui_cell_bd weui_cell_primary">
+                    <input class="weui_input" id="deviceName" type="text" v-model="deviceName" placeholder="请输入deviceName"/>
+                </div>
+            </div>
+        
+            <div class="weui_cell weui_cell_select weui_select_after">
+                <div class="weui_cell_hd">
+                    <label for="" class="weui_label">deviceType（设备类型）:</label>
+                </div>
+                <div class="weui_cell_bd weui_cell_primary">
+                    <select class="weui_select" id="deviceType" name="select2" v-model="deviceType" >
+                        
+                        <template v-for="(item, index) in deviceTypeData">
+
+                        	<option v-bind:value="item['value']">{{ item['title'] }}</option>
+                            
+                        </template>
+                        
+                    </select>
+                </div>
+            </div>
+            
+            <div class="weui_cell weui_cell_select weui_select_after">
+                <div class="weui_cell_hd">
+                    <label for="" class="weui_label">zone（位置）:</label>
+                </div>
+                <div class="weui_cell_bd weui_cell_primary">
+                    <select class="weui_select" id="zone" name="select2" v-model="zone" >
+                        
+                        <template v-for="(item, index) in zoneData">
+
+                        	<option v-bind:value="zoneData[index]">{{ item }}</option>
+                            
+                        </template>
+
+                        
+                    </select>
+                </div>
+            </div>
+            <div class="weui_cell">
+                <div class="weui_cell_hd"><label class="weui_label">brand（品牌）:</label></div>
+                <div class="weui_cell_bd weui_cell_primary">
+                    <input class="weui_input" id="brand" type="text" v-model="brand" placeholder="请输入brand"/>
+                </div>
+            </div>
+            <div class="weui_cell">
+                <div class="weui_cell_hd"><label class="weui_label">model（型号）:</label></div>
+                <div class="weui_cell_bd weui_cell_primary">
+                    <input class="weui_input" id="model" type="text" v-model="model" placeholder="请输入model"/>
+                </div>
+            </div>
+            <div class="weui_cell">
+                <div class="weui_cell_hd"><label class="weui_label">icon（图标）:</label></div>
+                <div class="weui_cell_bd weui_cell_primary">
+                    <input class="weui_input" id="icon" type="text" v-model="icon" placeholder="请输入icon"/>
+                </div>
+            </div>
+            <div class="weui_cell">
+                <div class="weui_cell_hd"><label for="" class="weui_label">properties（支持的属性状态）:</label></div>
+                <div class="weui_cell_bd weui_cell_primary">
+                    <input class="weui_input" type="text" value="" id='properties' placeholder="点击选择properties"/>
+                    
+                </div>
+            </div>
+            <div class="weui_cell">
+                <div class="weui_cell_hd"><label for="" class="weui_label">actions（支持的操作）:</label></div>
+                <div class="weui_cell_bd weui_cell_primary">
+                    <input class="weui_input" type="text" value="" id='actions' placeholder="点击选择actions"/>
+                    
+                </div>
+            </div>
+             
+</div>
+
+            <div class="weui_btn_area">
+                 <a href="javascript:;" class="weui_btn weui_btn bg-blue" @click="saveData()">添  加</a>
+	    </div> 
+
+
+   <div class="weui_cells" style="margin-bottom:  50px; display:none;"> 
+    <p style="margin: 22px;" id="jsonData">
+    {
+      "deviceId":"{{ deviceId }}",
+      "deviceName":"{{ deviceName }}",
+      "deviceType":"{{ deviceType }}",
+      "zone":"{{ zone }}",          
+      "brand":"{{ brand }}",
+      "model":"{{ model }}",     
+      "icon":"{{ icon }}",
+      "properties":{{ properties }},
+      "actions":{{ actions }},
+      "extensions":{
+         "extension1":"",
+         "extension2":""
+      }
+     }
+    
+    </p>
+    </div>
+    
+    
+    </div>
+<div class="weui-footer" style="margin-top: 70px;">
+<p class="weui-footer-text">Copyright &copy; qebabe</p>
+
+</div>
+</div>   
+      
+   <script>
+       
    
-$(function(){
-    $("#deviceId").select({
-       onChange: function(d) {
-         //$.alert(d.values);
-         //$("#ac").val(d.values);
-         var a = d.values;
-	 alert("hahhaha");
-	 console.log("aaaaa");
-	 console.log(d.values);
-       }
-     });
+ $(function(){
+     
+     $("#deviceId").select({
+        onChange: function(d) {
+          //$.alert(d.values);
+            //$("#ac").val(d.values);
+            var a = d.values;
+	    alert("hahhaha");
+	    console.log("aaaaa");
+	    console.log(d.values);
+        }
+      });
      $("#actions").select({
         title: "选择actions：",
         multi: true,
@@ -352,12 +383,13 @@ $(function(){
         items: vm.actionsData,
         onChange: function(d) {
           //$.alert(d.values);
-          //$("#ac").val(d.values);
-          var a = d.values.split(",")
-          for (var i=0;i<a.length;i++)
-          {
-              Vue.set(vm.actions,i,a[i]);
-          }
+            //$("#ac").val(d.values);
+            var a = d.values.split(",")
+            for (var i=0;i<a.length;i++)
+            {
+                Vue.set(vm.actions,i,a[i]);
+            }
+
         }
       });
      $("#properties").select({
@@ -368,24 +400,46 @@ $(function(){
         items: vm.propertiesData1,
         onChange: function(d) {
           //$.alert(d.values);
-          //$("#ac").val(d.values);
-              
-          var a = d.values.split(",")
-          var value
+            //$("#ac").val(d.values);
             
-          for (var i=0;i<a.length;i++)
-          {
-              value=vm.propertiesData[i].value;
-              var dd='{"'+a[i]+'":"'+value+'"}';
+            
+            var a = d.values.split(",")
+            var value
+            
+            for (var i=0;i<a.length;i++)
+            {
                 
-              Vue.set(vm.properties,i,JSON.parse(dd))    
-          }
-          //Vue.set(vm.properties,i,a[i]);       
+                value=vm.propertiesData[i].value;
+                var dd='{"'+a[i]+'":"'+value+'"}';
+                
+                Vue.set(vm.properties,i,JSON.parse(dd))
+                
+            }
+            //Vue.set(vm.properties,i,a[i]);
+            
+
         }
       });
- })         
-       
+     
+     
+     
+ })
          
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
 var vm = new Vue({
   el: '#app',
   data: {
@@ -643,11 +697,21 @@ var vm = new Vue({
         	}, function() {
           //取消操作
         	});
+
+            
+            
+            
+            
+        
+        
+        
         
         },
         saveData:function(){
         //$.toast("ret");
-            const that=this; 
+            const that=this;
+            
+            
             //var jsonData='{"deviceId":"'+that.deviceId+'","deviceName":"'+that.deviceName+'","deviceType":"'+that.deviceType+'","zone":"'+that.zone+'","brand":"'+that.brand+'","model":"'+that.model+'","icon":"'+that.icon+'","properties":"'+that.properties+'","actions":"'+that.actions+'","extensions":{   "extension1":"",   "extension2":""}}';
             var jsonData=$("#jsonData").html();
             
@@ -664,7 +728,10 @@ var vm = new Vue({
             } finally {
             
             }
-  
+            
+            
+            
+            
        console.log("obj.deviceId:"+obj.deviceId);
                 
                  if(obj.deviceId==undefined || obj.deviceId==""){
@@ -677,6 +744,11 @@ var vm = new Vue({
          			$.toast("deviceName不能为空！", "forbidden");
               		return;
         }  
+            
+            
+        
+            
+            
             
         var timestamp =Date.parse(new Date());
         var url ='service.php?v=add';
@@ -741,6 +813,10 @@ var vm = new Vue({
     }
     }
 })
+
+       
+    </script>
+    
     
 
 
