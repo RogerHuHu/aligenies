@@ -426,20 +426,6 @@ for($i=0;$i<$num;++$i){
  })
          
        
-       
-       
-       
-       
-       
-       
-       
-       
-       
-       
-       
-       
-       
-       
 var vm = new Vue({
   el: '#app',
   data: {
